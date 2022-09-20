@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="likeMapper">
+
+	<!-- 좋아요 확인(있으면 1, 없으면 0) -->
+	<select id="liketest" resultType="int" parameterType="hashMap">
+		SELECT count(*)
+		FROM B_LIKE
+		WHERE userid = #{userid}
+		AND board_seq = #{board_seq}
+	</select>
+	
+	<!-- 좋아요 등록 -->
+ 	<insert id="likeinsert" parameterType="hashMap">
+		INSERT INTO B_LIKE(
+							seq
+							,userid
+							,board_seq
+							)
+					VALUES(
+							B_LIKE_SEQ.NEXTVAL
+							,#{userid}
+							,#{board_seq}
+							)
+	</insert>
+	
+	<!-- 좋아요 취소 -->
+	<delete id="likedelete" parameterType="hashMap">
+		DELETE FROM B_LIKE
+		WHERE userid = #{userid}
+		AND board_seq = #{board_seq}
+	</delete>
+
+</mapper>

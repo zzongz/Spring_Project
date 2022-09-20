@@ -1,0 +1,42 @@
+@charset "UTF-8";
+
+.main_container{
+	width:950px;
+	margin:auto;
+}
+
+#listdiv{
+	border:1px solid gray;
+	display:flex;
+	flex-wrap:wrap;
+	width:950px;
+}
+
+#listdiv div{
+	border:1px solid gray;
+}
+
+#listdiv_first{
+	width:295px;
+	height:200px;
+	margin:10px;
+}
+
+#list_subject{
+	width:293px;
+	height:25px;
+}
+
+#list_top{
+	height:174px;
+}
+
+#list_bottom{
+	height:25px;
+	display:flex;
+	justify-content:center;
+}
+
+#bottom{
+	text-align:center;
+}

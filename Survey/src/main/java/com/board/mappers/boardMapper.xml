@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.board.mappers.boardmap">
+
+	<!-- 공지사항 목록 출력 -->
+	<select id="noticelist" resultType="com.board.domain.NoticeDTO">
+		SELECT *
+		FROM NOTICE
+		ORDER BY seq DESC
+	</select>
+	
+	<!-- 게시판 목록 출력 -->
+	<select id="list" resultType="com.board.domain.BoardDTO" parameterType="com.board.domain.SearchCriteria">
+		SELECT seq,
+			subject,
+			content,
+			name,
+			regist_date,
+			read_count,
+			org_file_name
+		FROM(
+			select a.seq,
+				a.subject,
+				a.content,
+				a.name,
+				a.regist_date,
+				a.read_count,
+				b.org_file_name,
+				ROW_NUMBER() OVER(ORDER BY a.seq DESC) AS RNUM
+			FROM BOARD a
+			LEFT OUTER JOIN (SELECT *
+							FROM B_FILE
+							WHERE (seq , file_no) IN(SELECT seq
+															,min(file_no)									 
+													FROM B_FILE
+													WHERE del_gb = 'N'
+													GROUP BY seq
+													)) b
+			ON a.seq = b.seq
+			WHERE 1=1
+			<!-- <include refid="search"></include> -->
+			)MP
+		WHERE RNUM BETWEEN #{rowStart} AND #{rowEnd}
+		ORDER BY seq DESC
+	</select>
+	
+	<!-- 게시판 목록 총 갯수 -->
+	<select id="listCount" parameterType="com.board.domain.SearchCriteria" resultType="int">
+		SELECT COUNT(seq)
+		FROM BOARD
+		WHERE 1=1
+		<!-- <include refid="search"></include> -->
+		AND seq > 0
+	</select>
+	
+	<!-- 게시판 글 검색 -->
+	<sql id="search">
+		<if test="searchType != null">
+			<if test="searchType == 't'.toString()">AND subject LIKE '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'c'.toString()">AND content LIKE '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'w'.toString()">AND name LIKE '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'tcw'.toString()">
+			AND (subject LIKE '%' || #{keyword} || '%' or content LIKE '%' || #{keyword} || '%'
+				 or name LIKE '%' || #{keyword} || '%')</if>
+		</if>
+	</sql>
+	
+	<!-- 게시판 글 작성 -->
+	<insert id="insert" parameterType="com.board.domain.BoardDTO" useGeneratedKeys="true" keyProperty="seq">
+ 		<selectKey keyProperty="seq" resultType="int" order="BEFORE">
+			SELECT BOARD_NUM.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO BOARD(seq,
+						subject,
+						content,
+						name)
+				VALUES(	#{seq},
+						#{subject},
+						#{content},
+						#{name})
+	</insert>
+	
+	<!-- 첨부 파일 등록 -->
+	<insert id="insertFile" parameterType="hashMap">
+		INSERT INTO B_FILE(
+			FILE_NO,
+			SEQ,
+			ORG_FILE_NAME,
+			STORED_FILE_NAME,
+			FILE_SIZE)
+		VALUES(
+			SEQ_B_FILE_NO.NEXTVAL,
+			#{SEQ},
+			#{ORG_FILE_NAME},
+			#{STORED_FILE_NAME},
+			#{FILE_SIZE})
+	</insert>
+	
+	<!-- 첨부 파일 조회 -->
+	<select id="selectFileList" parameterType="int" resultType="hashMap">
+		SELECT file_no,
+			org_file_name,
+  			ROUND(file_size/1024,1) AS file_size,
+  			del_gb,
+  			download
+		FROM B_FILE
+		WHERE seq = #{seq}
+		AND	del_gb = 'N'
+		ORDER BY file_no ASC
+	</select>
+	
+	<!-- 첨부 파일 다운 -->
+	<select id="selectFileInfo" parameterType="hashMap" resultType="hashMap">
+	SELECT 
+		STORED_FILE_NAME,
+		ORG_FILE_NAME
+	FROM B_FILE
+	WHERE FILE_NO = #{FILE_NO}
+	</select>
+	
+	<!-- 첨부 파일 다운로드 수 -->
+	<update id="downloadHit" parameterType="hashMap">
+		UPDATE B_FILE
+		SET DOWNLOAD = DOWNLOAD+1
+		WHERE seq = #{SEQ}
+		AND org_file_name = #{ORG_FILE_NAME}
+	</update>
+	
+	<!-- 첨부 파일 수정 -->
+	<update id="updateFile" parameterType="hashMap">
+		UPDATE B_FILE SET
+		DEL_GB = 'Y'
+		WHERE FILE_NO = #{FILE_NO}
+	</update>
+	
+	<!-- 답글 등록 -->
+	<insert id="answerwrite">
+		INSERT INTO BOARD(seq,
+						subject,
+						content,
+						name,
+						groupid,
+						parentid
+						)
+				VALUES(	BOARD_NUM.NEXTVAL,
+						#{subject},
+						#{content},
+						#{name},
+						#{groupId},
+						#{parentId})
+	</insert>
+	
+	<!-- 게시판 글 조회 -->
+	<select id="read" parameterType="int" resultType="com.board.domain.BoardDTO">
+		SELECT seq,
+			subject,
+			content,
+			name,
+			regist_date
+		FROM BOARD
+		WHERE seq = #{seq}
+	</select>
+	
+	<!-- 게시판 글 수정 -->
+	<update id="update" parameterType="com.board.domain.BoardDTO">
+		UPDATE BOARD
+		SET	subject = #{subject},
+			content = #{content}
+		WHERE seq = #{seq}
+	</update>
+	
+	<!-- 게시판 글 삭제 -->
+	<delete id="delete" parameterType="int">
+		DELETE
+		FROM BOARD
+		WHERE seq = #{seq}
+	</delete>
+	
+	<!-- 게시판 조회수 -->
+	<update id="boardHit" parameterType="int">
+		UPDATE BOARD
+		SET read_count = read_count+1
+		WHERE seq = #{seq}
+	</update>
+	
+		<!-- 파일 검색 리스트 -->
+	<select id="filelist" resultType="com.board.domain.BoardDTO" parameterType="com.board.domain.SearchCriteria">
+	SELECT *
+	FROM(
+			SELECT seq, subject, name, regist_date, null org_file_name , 'B' as typeid
+			FROM BOARD
+			
+			UNION ALL
+			
+			SELECT survey_seq, subject, userid, regdate, null org_file_name, 'S'
+			FROM SURVEY_LIST
+			
+			UNION ALL
+			
+			SELECT B.seq, B.subject, B.name, B.regist_date, F.org_file_name, 'F' 
+			FROM BOARD B JOIN B_FILE F
+			ON B.SEQ = F.SEQ
+			)
+	WHERE 1=1
+	<include refid="allsearch"></include>
+	</select>
+	
+	<!-- 통합 검색 리스트 -->
+	<select id="alllist" resultType="com.board.domain.BoardDTO" parameterType="com.board.domain.SearchCriteria">
+	SELECT *
+	FROM(
+			SELECT seq, subject, name, regist_date, null org_file_name , 'B' as typeid
+			FROM BOARD
+			
+			UNION ALL
+			
+			SELECT survey_seq, subject, userid, regdate, null org_file_name, 'S'
+			FROM SURVEY_LIST
+			)
+	WHERE 1=1
+	<include refid="allsearch"></include>
+	</select>
+	
+	<!-- 게시판 글 검색 -->
+	<sql id="allsearch">
+		<if test="searchType != null">
+			<if test="searchType == 't'.toString()">AND subject LIKE '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'c'.toString()">AND name LIKE '%' || #{keyword} || '%'</if>
+			<if test="searchType == 'w'.toString()">AND org_file_name LIKE '%' || #{keyword} || '%'</if>
+		</if>
+	</sql>
+	
+</mapper>

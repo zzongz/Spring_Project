@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+ <mapper namespace="menuMapper">
+ 	
+ 	<!-- 메뉴 목록 출력 -->
+	<select id="list" resultType="com.board.domain.MenuDTO" parameterType="com.board.domain.SearchCriteria">
+		SELECT menu_seq
+			,menu_name
+			,menu_type
+			,menu_link
+			,board_seq
+		FROM(
+			select menu_seq,
+				menu_name,
+				menu_type,
+				menu_link,
+				board_seq,
+				ROW_NUMBER() OVER(ORDER BY menu_seq DESC) AS RNUM
+			FROM MENU
+			WHERE 1=1
+			)MP
+		WHERE RNUM BETWEEN #{rowStart} AND #{rowEnd}
+		ORDER BY menu_seq DESC
+	</select>
+	
+	<!-- 메뉴 목록 총 갯수 -->
+	<select id="listCount" parameterType="com.board.domain.SearchCriteria" resultType="int">
+		SELECT COUNT(menu_seq)
+		FROM MENU
+		WHERE 1=1
+		AND menu_seq > 0
+	</select>
+	
+	<!-- 메뉴 상세보기(조회) -->
+	<select id="read" parameterType="int" resultType="com.board.domain.MenuDTO">
+		SELECT *
+		FROM MENU
+		WHERE menu_seq = #{menu_seq}
+	</select>
+	
+	<!-- 메뉴 등록 -->
+	<insert id="insert">
+		INSERT INTO MENU(
+						menu_seq
+						,menu_name
+						,menu_type
+						,menu_link
+						,board_seq
+						,user_auth
+						)
+				VALUES(
+						MENU_SEQ.NEXTVAL
+						,#{menu_name}
+						,#{menu_type}
+						,#{menu_link}
+						,#{board_seq}
+						,#{user_auth}
+						)
+	</insert>
+	
+	<!-- 메뉴 삭제 -->
+	<delete id="delete" parameterType="int">
+		DELETE
+		FROM MENU
+		WHERE menu_seq = #{menu_seq}
+	</delete>
+	
+	<!-- 메뉴 출력 -->
+	<select id="menuauthlist" resultType="com.board.domain.MenuDTO">
+		SELECT *
+		FROM MENU
+	</select>
+	
+	<!-- 권한에 따른 메뉴 출력(접근) -->
+	<select id="menuaccesslist" resultType="com.board.domain.MenuDTO" parameterType="String">
+		SELECT *
+		FROM MENU
+		WHERE user_auth = #{auth}
+	</select>
+	
+	<!-- 메뉴 조회수 증가 INSERT -->
+	<insert id="menucount" parameterType="hashMap">
+		INSERT INTO TOTAL(
+							seq
+							,menu_seq
+							,menu_name
+							,myear
+							,mmonth
+							,mday
+							,mtime
+							)
+					VALUES(
+							TOTAL_SEQ.NEXTVAL
+							,#{menu_seq}
+							,#{menu_name}
+							,TO_CHAR(SYSDATE, 'YYYY')
+							,TO_CHAR(SYSDATE, 'MM')
+							,TO_CHAR(SYSDATE, 'DD')
+							,TO_CHAR(SYSDATE, 'HH24')
+							)
+	</insert>
+	
+	<!-- 통계(연도별) -->
+	<select id="totalyear" resultType="java.util.LinkedHashMap">
+	SELECT *
+	FROM(
+		select menu_name as 메뉴명, TO_CHAR(TO_DATE(myear, 'YYYY'), 'YYYY') AS myear
+		from TOTAL
+		)
+	PIVOT(
+		count(*)
+		FOR myear IN(2020,2021,2022)
+		)
+	ORDER BY 1;
+	</select>
+	
+	<!-- 통계(월별) -->
+	<select id="totalmonth" resultType="java.util.LinkedHashMap">
+	SELECT *
+	FROM(
+		select menu_name as 메뉴명, TO_CHAR(TO_DATE(mmonth, 'MM'), 'MM') AS mmonth
+		from TOTAL
+		)
+	PIVOT(
+		count(*)
+		FOR mmonth IN(01,02,03,04,05,06,07,08,09,10,11,12)
+		)
+	ORDER BY 1;
+	</select>
+	
+	<!-- 통계(일별) -->
+	<select id="totalday" resultType="java.util.LinkedHashMap">
+	SELECT *
+	FROM(
+		select menu_name, TO_CHAR(TO_DATE(mday, 'DD'), 'DD') AS mday
+		from TOTAL
+		)
+	PIVOT(
+		count(*)
+		FOR mday IN(01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31)
+		)
+	ORDER BY 1;
+	</select>
+	
+	<!-- 통계(시간별) -->
+	<select id="totalhour" resultType="java.util.LinkedHashMap">
+	SELECT *
+	FROM(
+		select menu_name, TO_CHAR(TO_DATE(mtime, 'HH24'), 'HH24') AS mtime
+		from TOTAL
+		)
+	PIVOT(
+		count(*)
+		FOR mtime IN(01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24)
+		)
+	ORDER BY 1;
+	</select>
+</mapper>

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="SurveyMapper">
+
+	<!-- 설문 목록 출력 -->
+	<select id="list" resultType="com.board.domain.SurveyListDTO">
+		SELECT survey_seq
+			,subject
+			,userid
+			,regdate
+			,progress
+		FROM SURVEY_LIST
+		ORDER BY survey_seq DESC
+	</select>
+	
+	<!-- 설문 정보 출력 -->
+	<select id="info" resultType="com.board.domain.SurveyListDTO">
+		SELECT survey_seq
+		,host
+		,target
+		,startdate
+		,enddate
+		,question_count
+		,awarddate
+		FROM SURVEY_LIST
+		WHERE survey_seq = #{survey_seq}
+	</select>
+	
+	<!-- 설문지 질문 출력 -->
+	<select id="questionlist" resultType="com.board.domain.SurveyQuestionDTO" parameterType="hashMap">
+		SELECT A.*, NVL(B.answer,'') as answer
+		FROM(SELECT question_seq
+				,survey_seq
+				,seq
+				,question_type
+				,title
+				,content
+				,regdate
+				,seltype
+				,parentid
+				,groupid
+		FROM(
+				SELECT question_seq
+						,survey_seq
+						,seq
+						,question_type
+						,title
+						,content
+						,regdate
+						,seltype
+						,parentid
+						,groupid
+						,ROW_NUMBER() OVER(ORDER BY seq) as RNUM
+				FROM SURVEY_QUESTION
+				WHERE survey_seq = #{survey_seq}
+									)MP
+		WHERE RNUM BETWEEN #{cri.rowStart} AND #{cri.rowEnd}
+		)A LEFT OUTER JOIN (SELECT userid, survey_seq, question_seq, AGGR_CONCAT(answer, ',') as answer FROM USER_ANSWER
+							GROUP BY userid,survey_seq,question_seq) B
+		ON A.survey_seq = B.survey_seq
+		AND A.question_seq = B.question_seq
+		AND B.userid = #{userid}
+		ORDER BY A.seq
+	</select>
+	
+	<!-- 설문 리스트 개수 -->
+	<select id="listCount" resultType="int">
+	<![CDATA[
+		SELECT COUNT(seq)
+		FROM SURVEY_QUESTION
+		WHERE seq > 0
+	]]>
+	</select>
+	
+	<!-- 전체 질문 개수 -->
+	<select id="questionCnt" resultType="int" parameterType="hashMap">
+	<![CDATA[
+		SELECT COUNT(1)
+		FROM SURVEY_QUESTION
+		WHERE question_type = '필수'
+		AND survey_seq = #{survey_seq}
+		AND parentid != seq
+	]]>
+	</select>
+	
+	<!-- 답변한 질문 개수 -->
+	<select id="answerCnt" resultType="int" parameterType="hashMap">
+	<![CDATA[
+		SELECT COUNT(1) 
+		FROM (SELECT question_seq
+				FROM USER_ANSWER
+				WHERE survey_seq = #{survey_seq}
+				AND userid = #{userid}
+				GROUP BY question_seq)
+	]]>
+	</select>
+	
+	<!-- 설문지 답변 목록 출력 -->
+	<select id="answerlist" resultType="com.board.domain.SurveyAnswerDTO">
+		SELECT *
+		FROM SURVEY_ANSWER
+		WHERE survey_seq = #{survey_seq}
+	</select>
+
+	<!-- 사용자 응답 출력 -->
+	<select id="useranswerCnt" resultType="int" parameterType="hashMap">
+		SELECT count(*) cnt
+		FROM USER_ANSWER
+		WHERE userid = #{userid}
+		AND survey_seq = #{survey_seq}
+		AND question_seq = #{question_seq}
+		<if test='seltype == "2"'>
+			AND answer = #{answer}
+		</if> 
+	</select>
+	
+	<!-- 사용자 응답 저장 -->
+	<insert id="useranswerinsert" parameterType="hashMap">
+		INSERT INTO USER_ANSWER(seq
+								,userid
+								,survey_seq
+								,question_seq
+								,answer)
+						VALUES(USER_ANSWER_SEQ.NEXTVAL
+								,#{userid}
+								,#{survey_seq}
+								,#{question_seq}
+								,#{answer})
+	</insert>
+	
+	<!-- 사용자 응답 수정 -->
+	<update id="useranswerupdate" parameterType="hashMap">
+		UPDATE USER_ANSWER SET
+			answer = #{answer}
+		WHERE userid = #{userid}
+		AND survey_seq = #{survey_seq}
+		AND question_seq = #{question_seq}
+		<if test='seltype == "2"'>
+			AND answer = #{answer}
+		</if> 
+	</update>
+	
+	<!-- 사용자 응답 삭제 -->
+	<delete id="useranswerdelete" parameterType="hashMap">
+		DELETE FROM USER_ANSWER
+		WHERE userid = #{userid}
+		AND survey_seq = #{survey_seq}
+		AND question_seq = #{question_seq}
+		<if test='seltype == "2"'>
+			AND answer = #{answer}
+		</if> 
+	</delete>
+	
+	<!-- 사용자 응답 종료 저장 -->
+	<insert id="useranswerfinish" parameterType="hashMap">
+		INSERT INTO SURVEY_FINISH(userid
+								,survey_seq)
+						VALUES(#{userid}
+							,#{survey_seq})
+	</insert>
+	
+ 	<!-- 사용자 설문 확인 -->
+	<select id="checkCnt" resultType="int" parameterType="hashMap">
+		SELECT count(1)
+		FROM SURVEY_FINISH
+		WHERE userid = #{userid}
+		AND survey_seq = #{survey_seq}
+	</select>
+</mapper>
